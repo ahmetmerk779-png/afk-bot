@@ -1,0 +1,16 @@
+{
+  "name": "mc-afk-bot",
+  "version": "1.0.0",
+  "description": "Render için Minecraft AFK Botu",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "minecraft-protocol": "^1.52.0"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
