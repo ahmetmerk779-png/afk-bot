@@ -1,14 +1,14 @@
 {
-  "name": "mc-afk-bot",
+  "name": "mc-afk-bot-panel",
   "version": "1.0.0",
-  "description": "Render için Minecraft AFK Botu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "minecraft-protocol": "^1.52.0"
+    "minecraft-protocol": "^1.52.0",
+    "socket.io": "^4.7.5"
   },
   "engines": {
     "node": ">=18.x"
