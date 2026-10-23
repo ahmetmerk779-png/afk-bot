@@ -1,9 +1,10 @@
 {
-  "name": "mc-afk-bot-panel",
+  "name": "multi-mc-bots-panel",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Çoklu Minecraft Botları Web Paneli",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
