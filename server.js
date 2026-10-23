@@ -9,23 +9,20 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Bot ve Yönetim Değişkenleri
-let activeBots = []; // Çalışan bot objelerini tutar
+let activeBots = [];
 let isRunning = false;
 
-// Varsayılan Ayarlar
 let botConfig = {
     host: 'oyun.sunucuadresi.com',
     port: 25565,
     version: '1.20.6',
     botCount: 3,
     namePrefix: 'Bot_',
-    antiAfkDelay: 15
+    antiAfkDelay: 20
 };
 
 app.use(express.static('public'));
 
-// Web Paneli Arayüzü (HTML / CSS / JS)
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -33,7 +30,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Çoklu Minecraft Bot Paneli</title>
+    <title>Gelişmiş Çoklu Minecraft Bot Paneli</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -63,7 +60,7 @@ app.get('/', (req, res) => {
 <body>
     <div class="container">
         <div class="card">
-            <h2>Bot Havuzu Ayarları</h2>
+            <h2>Güvenli Bot Havuzu Ayarları</h2>
             <div id="statusBadge" class="status-badge status-offline">TÜM BOTLAR KAPALI</div>
             
             <div class="form-group">
@@ -92,7 +89,7 @@ app.get('/', (req, res) => {
             </div>
 
             <div class="btn-group">
-                <button class="btn-start" onclick="startBots()">Tüm Botları Başlat</button>
+                <button class="btn-start" onclick="startBots()">Korumalı Başlat</button>
                 <button class="btn-stop" onclick="stopBots()">Tümünü Durdur</button>
             </div>
         </div>
@@ -101,7 +98,7 @@ app.get('/', (req, res) => {
             <h2>Canlı Terminal & Toplu Komut</h2>
             <div id="terminal"></div>
             <div class="chat-input-group">
-                <input type="text" id="globalCommand" placeholder="Bütün botlara komut gönder (örn: /home)..." onkeydown="if(event.key==='Enter') sendGlobalCommand()">
+                <input type="text" id="globalCommand" placeholder="Bütün botlara komut gönder..." onkeydown="if(event.key==='Enter') sendGlobalCommand()">
                 <button onclick="sendGlobalCommand()">Tümüne Gönder</button>
             </div>
         </div>
@@ -121,7 +118,7 @@ app.get('/', (req, res) => {
 
         socket.on('status', (data) => {
             if(data.running) {
-                statusBadge.textContent = \`AKTİF (Çalışan Bot: \${data.count})\`;
+                statusBadge.textContent = \`KORUMALI AKTİF (Bot: \${data.count})\`;
                 statusBadge.className = "status-badge status-online";
             } else {
                 statusBadge.textContent = "TÜM BOTLAR KAPALI";
@@ -158,24 +155,21 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Terminal Log Fonksiyonu
 function logToConsole(message) {
     console.log(message);
     io.emit('log', message);
 }
 
-// Rastgele İsim Üretici
 function generateRandomName(prefix) {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}${randomNum}`;
 }
 
-// Tekil Bot Oluşturma ve Yönetme
 function createSingleBot(index, config) {
     if (!isRunning) return;
 
     const username = generateRandomName(config.namePrefix);
-    logToConsole(`[Bot #${index + 1}] "${username}" ismiyle bağlanılıyor...`);
+    logToConsole(`[Bot #${index + 1}] "${username}" ismiyle güvenli bağlantı kuruluyor...`);
 
     const client = mc.createClient({
         host: config.host,
@@ -194,32 +188,41 @@ function createSingleBot(index, config) {
     };
 
     client.on('login', () => {
-        logToConsole(`[BAŞARILI] "${username}" oyuna giriş yaptı.`);
+        logToConsole(`[BAŞARILI] "${username}" sunucuya giriş yaptı.`);
     });
 
-    // Anti-AFK Döngüsü
-    const intervalMs = (config.antiAfkDelay || 15) * 1000;
-    botObj.antiAfkInterval = setInterval(() => {
-        try {
-            client.write('position', {
-                x: 0,
-                y: 64,
-                z: 0,
-                onGround: true
-            });
-        } catch (e) {}
-    }, intervalMs);
+    // Spawn olduktan sonra Anti-AFK'yı güvenli bir gecikmeyle başlat
+    client.on('spawn', () => {
+        logToConsole(`[SPAWN] "${username}" haritaya yüklendi.`);
+        
+        // Anti-AFK Döngüsü (Her bot için rastgele jitter eklenmiş süre)
+        const baseInterval = (config.antiAfkDelay || 20) * 1000;
+        const jitter = Math.random() * 5000; // 0-5 saniye rastgele sapma
+        
+        botObj.antiAfkInterval = setInterval(() => {
+            try {
+                client.write('position', {
+                    x: (Math.random() - 0.5) * 0.5,
+                    y: 64,
+                    z: (Math.random() - 0.5) * 0.5,
+                    onGround: true
+                });
+            } catch (e) {}
+        }, baseInterval + jitter);
+    });
 
     client.on('end', (reason) => {
         logToConsole(`[KOPMA] "${username}" düştü. Sebep: ${reason}`);
-        clearInterval(botObj.antiAfkInterval);
+        if (botObj.antiAfkInterval) clearInterval(botObj.antiAfkInterval);
 
-        // Auto-Reconnect
+        // Akıllı Auto-Reconnect: Botların hepsi aynı anda bağlanmasın diye 15 ile 35 saniye arası rastgele bekletilir
         if (isRunning) {
-            logToConsole(`[YENİDEN BAĞLANMA] "${username}" 10 saniye sonra tekrar bağlanacak...`);
+            const randomWait = Math.floor(Math.random() * 20000) + 15000; // 15s - 35s arası
+            logToConsole(`[GÜVENLİ BEKLEME] "${username}" ${Math.round(randomWait / 1000)} saniye sonra tekrar bağlanacak...`);
+            
             botObj.reconnectTimeout = setTimeout(() => {
                 createSingleBot(index, config);
-            }, 10000);
+            }, randomWait);
         }
     });
 
@@ -230,35 +233,35 @@ function createSingleBot(index, config) {
     activeBots.push(botObj);
 }
 
-// Tüm Botları Başlatma
 function startAllBots(config) {
-    stopAllBots(); // Önce varsa eski botları temizle
+    stopAllBots();
     isRunning = true;
     botConfig = config;
 
-    logToConsole(`Toplam ${config.botCount} adet bot sırayla başlatılıyor...`);
+    logToConsole(`Toplam ${config.botCount} bot anti-bot korumasını tetiklememek için kademeli olarak başlatılıyor...`);
     io.emit('status', { running: true, count: config.botCount });
 
     for (let i = 0; i < config.botCount; i++) {
-        // Sunucu Flood / Çakışma atmasın diye botlar arasına 2.5 saniye gecikme koyuyoruz
+        // Her bot arasında en az 6-8 saniye fark bırakarak sunucunun flood koruması bypass edilir
+        const stepDelay = i * 7000 + Math.random() * 2000;
+        
         setTimeout(() => {
             if (isRunning) {
                 createSingleBot(i, config);
             }
-        }, i * 2500);
+        }, stepDelay);
     }
 }
 
-// Tüm Botları Durdurma
 function stopAllBots() {
     isRunning = false;
-    logToConsole('Tüm botlar durduruluyor...');
+    logToConsole('Tüm botlar güvenli şekilde durduruluyor...');
 
     activeBots.forEach(bot => {
         if (bot.antiAfkInterval) clearInterval(bot.antiAfkInterval);
         if (bot.reconnectTimeout) clearTimeout(bot.reconnectTimeout);
         try {
-            bot.client.end('Panel üzerinden kapatıldı.');
+            bot.client.end('Panel kapatıldı.');
         } catch (e) {}
     });
 
@@ -267,10 +270,9 @@ function stopAllBots() {
     logToConsole('Tüm bot bağlantıları sonlandırıldı.');
 }
 
-// Socket.io Bağlantı Yönetimi
 io.on('connection', (socket) => {
     socket.emit('status', { running: isRunning, count: activeBots.length });
-    socket.emit('log', 'Web Paneline başarıyla bağlandınız.');
+    socket.emit('log', 'Web Paneline bağlanıldı. Güvenlik önlemleri aktif.');
 
     socket.on('start_bots', (config) => {
         startAllBots(config);
@@ -280,22 +282,24 @@ io.on('connection', (socket) => {
         stopAllBots();
     });
 
-    // Bütün botlara aynı anda komut/mesaj gönderme
     socket.on('global_command', (cmd) => {
         if (!isRunning || activeBots.length === 0) {
-            logToConsole('[UYARI] Aktif çalışan bot bulunamadığı için komut gönderilemedi.');
+            logToConsole('[UYARI] Aktif bot bulunamadığı için komut iletilemedi.');
             return;
         }
 
-        logToConsole(`[TOPLU KOMUT -> TÜM BOTLAR]: ${cmd}`);
-        activeBots.forEach(bot => {
-            try {
-                bot.client.write('chat', { message: cmd });
-            } catch (e) {}
+        logToConsole(`[TOPLU KOMUT]: ${cmd}`);
+        activeBots.forEach((bot, index) => {
+            // Komutlar da aynı anda gitmesin, milisaniyelik gecikmelerle iletilsin
+            setTimeout(() => {
+                try {
+                    bot.client.write('chat', { message: cmd });
+                } catch (e) {}
+            }, index * 200);
         });
     });
 });
 
 server.listen(PORT, () => {
-    console.log(`Çoklu Bot Web Paneli http://localhost:${PORT} adresinde çalışıyor.`);
+    console.log(`Güvenli Çoklu Bot Paneli http://localhost:${PORT} adresinde çalışıyor.`);
 });
